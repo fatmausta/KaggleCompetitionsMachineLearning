@@ -5,7 +5,8 @@ import time
 import argparse
 import logging
 import pandas as pd
-import sklearn
+from sklearn import svm
+
 
 def main():
     # set up argumet parser
@@ -49,14 +50,20 @@ if __name__ == '__main__':
     logging.info('Size of training set: {} (%{:.2f})'.format(len(train_df), len(train_df)/size_total*100))
     logging.info('Size of test set: {} (%{:.2f})'.format(len(test_df), len(test_df)/size_total*100))
 
-    # Select target column
-    train_y = train_df[['Survived']]
+    # Select features to train and test, convert categorical features to dummy features
+    train_df = pd.get_dummies(train_df[['Survived', 'Pclass', 'Sex', 'Age', 'Fare', 'Embarked']], columns=['Sex', 'Embarked'])
+    test_df = pd.get_dummies(test_df[['Pclass', 'Sex', 'Age', 'Fare', 'Embarked']], columns=['Sex', 'Embarked'])
+    # drop nan features
+    train_df.dropna(inplace=True)
+    test_df.dropna(inplace=True)
 
-    # Select features to train and test
-    train_x = train_df[['Pclass', 'Sex', 'Age', 'Fare', 'Embarked']]
-    test_y = test_df[['Pclass', 'Sex', 'Age', 'Fare', 'Embarked']]
-
-
+    # set up an SVM classifier
+    clf = svm.SVC()
+    clf.fit(train_df.iloc[:, 1:], train_df['Survived'])
+    predictions = clf.predict(test_df)
+    print(predictions)
+    logging.info('predictions:\n{}'.format(predictions))
     print('End')
     end = time.time()
+    logging.info('Took {:.2f} seconds'.format(end-start))
 
