@@ -126,15 +126,22 @@ def train_and_test(train_df, test_df):
 
     """
     # set up an SVM classifier
-    clf = svm.SVC(C=0.8)
-    clf.fit(train_df.iloc[:, 1:], train_df['Survived'])
-    predictions_train = clf.predict(train_df.iloc[:, 1:])
-    predictions = clf.predict(test_df)
-    print('training accuracy: {}'.format(accuracy_score(predictions_train, train_df['Survived'])))
+    C = .8
     logging.info('Training using an SVM model.')
-    # print(predictions)
-    # logging.info('predictions:\n{}'.format(predictions))
-    return predictions
+    logging.info('SVM Params: C: {}'.format(C))
+    clf = svm.SVC(C=C)
+    clf.fit(train_df.iloc[:, 1:], train_df['Survived'])
+    # create training and test split
+    x_train, x_test, y_train, y_test = train_test_split(train_df.iloc[:, 1:], train_df.iloc[:,0], test_size=0.3)#,
+                                                        # stratify=True, random_state=101)
+        # train_test_split(train_df, test_df, test_size=0.3, random_state=101)
+    pred_train = clf.predict(x_train)
+    pred_test = clf.predict(x_test)
+
+    logging.info('training accuracy: {}'.format(accuracy_score(y_train, pred_train)))
+    logging.info('validation accuracy: {}'.format(accuracy_score(y_test, pred_test)))
+
+    return clf
 
 
 if __name__ == '__main__':
@@ -145,8 +152,9 @@ if __name__ == '__main__':
 
     train_df, test_df = main()
     train_df, test_df = feature_engineering(train_df, test_df)
-    predictions = train_and_test(train_df, test_df)
+    model = train_and_test(train_df, test_df)
 
+    predictions = model.predict(test_df)
     print('End')
     end = time.time()
     logging.info('Took {:.2f} seconds'.format(end-start))
