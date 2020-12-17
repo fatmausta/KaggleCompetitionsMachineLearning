@@ -7,6 +7,8 @@ import logging
 import pandas as pd
 from sklearn import svm
 from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import scale
 
 
 def main():
@@ -84,8 +86,20 @@ def feature_engineering(train_df, test_df):
     """
 
     # Select features to train and test, convert categorical features to dummy features
-    train_df = pd.get_dummies(train_df[['Survived', 'Pclass', 'Sex', 'Age', 'Fare', 'Embarked']], columns=['Sex', 'Embarked'])
-    test_df = pd.get_dummies(test_df[['Pclass', 'Sex', 'Age', 'Fare', 'Embarked']], columns=['Sex', 'Embarked'])
+    feature_cols = ['Pclass', 'Sex', 'Age', 'Fare', 'Embarked']
+
+    logging.info('Features used: {}'.format(feature_cols))
+    print('Features used: {}'.format(feature_cols))
+
+    train_df = pd.get_dummies(train_df[['Survived'] + feature_cols], columns=['Sex', 'Embarked'])
+    test_df = pd.get_dummies(test_df[feature_cols], columns=['Sex', 'Embarked'])
+
+    # Scale features
+    train_df['Age'] = scale(train_df['Age'])
+    train_df['Fare'] = scale(train_df['Fare'])
+
+    logging.info('Scaled features')
+
     # drop nan features
     train_df.dropna(inplace=True)
     test_df.dropna(inplace=True)
@@ -112,12 +126,14 @@ def train_and_test(train_df, test_df):
 
     """
     # set up an SVM classifier
-    clf = svm.SVC()
+    clf = svm.SVC(C=0.8)
     clf.fit(train_df.iloc[:, 1:], train_df['Survived'])
+    predictions_train = clf.predict(train_df.iloc[:, 1:])
     predictions = clf.predict(test_df)
-    logging.info('Training usign an SVM model.')
-    print(predictions)
-    logging.info('predictions:\n{}'.format(predictions))
+    print('training accuracy: {}'.format(accuracy_score(predictions_train, train_df['Survived'])))
+    logging.info('Training using an SVM model.')
+    # print(predictions)
+    # logging.info('predictions:\n{}'.format(predictions))
     return predictions
 
 
