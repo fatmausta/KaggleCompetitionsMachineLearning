@@ -6,16 +6,20 @@ import argparse
 import logging
 import pandas as pd
 from sklearn import svm
-from sklearn.metrics import accuracy_score, plot_roc_curve
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import precision_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import plot_roc_curve
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import scale
 import matplotlib.pyplot as plt
 
 
-def main():
+def read_data():
     """
 
-    Reads training and test files ad returns them as dataframe.
+    Reads training and test files and returns them as dataframe.
 
     Parameters
     ----------
@@ -59,6 +63,7 @@ def main():
     test_df = pd.read_csv(test_file)
 
     size_total = len(train_df) + len(test_df)
+    logging.info('Total training set size: {} (%100)'.format(size_total))
     logging.info('Size of training set: {} (%{:.2f})'.format(len(train_df), len(train_df)/size_total*100))
     logging.info('Size of test set: {} (%{:.2f})'.format(len(test_df), len(test_df)/size_total*100))
 
@@ -111,7 +116,7 @@ def feature_engineering(train_df, test_df):
     return train_df, test_df
 
 
-def train_and_test(train_df):
+def train_and_test(train_df, test_df):
     """
 
     Train and test using SVM and return predictions.
@@ -134,20 +139,41 @@ def train_and_test(train_df):
     clf = svm.SVC(C=C)
     clf.fit(train_df.iloc[:, 1:], train_df['Survived'])
     # create training and test split
-    x_train, x_test, y_train, y_test = train_test_split(train_df.iloc[:, 1:], train_df.iloc[:,0], test_size=0.3)#,
+    x_train, x_val, y_train, y_val = train_test_split(train_df.iloc[:, 1:], train_df.iloc[:,0], test_size=0.3)#,
 
     pred_train = clf.predict(x_train)
-    pred_test = clf.predict(x_test)
+    pred_val = clf.predict(x_val)
+    size_total = len(x_train) + len(x_val) + len(test_df)
+
+    prev_train = sum(y_train)/len(y_train)
+    prev_val = sum(y_val)/len(y_val)
+
+    logging.info('prevalence of training dataset: {}'.format(prev_train))
+    logging.info('prevalence of validation dataset: {}'.format(prev_val))
+
+    logging.info('Size of training set: {} (%{:.2f})'.format(len(x_train), len(x_train)/size_total*100))
+    logging.info('Size of validation set: {} (%{:.2f})'.format(len(x_val), len(x_val)/size_total*100))
+    logging.info('Size of test set: {} (%{:.2f})'.format(len(test_df), len(test_df)/size_total*100))
 
     logging.info('training accuracy: {}'.format(accuracy_score(y_train, pred_train)))
-    logging.info('validation accuracy: {}'.format(accuracy_score(y_test, pred_test)))
+    logging.info('validation accuracy: {}'.format(accuracy_score(y_val, pred_val)))
+
+    print('training accuracy: {} precision: {} recall: {} '.format(accuracy_score(y_train, pred_train), precision_score(y_train, pred_train), recall_score(y_train, pred_train)))
+    print('validation accuracy: {} precision: {} recall: {}'.format(accuracy_score(y_val, pred_val), precision_score(y_val, pred_val), recall_score(y_val, pred_val)))
+
+    print('training conf matrix: \n{}'.format(confusion_matrix(y_train, pred_train)))
+    print('validation conf matrix: \n{}'.format(confusion_matrix(y_val, pred_val)))
+
+    logging.info('')
+    logging.info('Predictions training: \n{}'.format(pred_train))
+    logging.info('Predictions validation: \n{}'.format(pred_val))
 
     plot_roc_curve(clf, x_train, y_train)
     plt.title('Training set ROC Curve')
     plt.savefig('plots/training_ROC.png')
     plt.show()
     plt.clf()
-    plot_roc_curve(clf, x_test, y_test)
+    plot_roc_curve(clf, x_val, y_val)
     plt.title('Validation set ROC Curve')
     plt.savefig('plots/validation_ROC.png')
     plt.show()
@@ -159,11 +185,11 @@ if __name__ == '__main__':
     start = time.time()
     # set up logger
     FORMAT = '%(asctime)-15s %(levelname)s-8s %(message)s'
-    logging.basicConfig(filename='logs/run_{}.log'.format(time.strftime("%Y.%m.%d_%H.%M.%S"), time.localtime()), format=FORMAT, level=logging.DEBUG)
+    logging.basicConfig(filename='logs/run_{}.log'.format(time.strftime("%Y.%m.%d_%H.%M.%S"), time.localtime()), format=FORMAT, level=logging.INFO)
 
-    train_df, test_df = main()
+    train_df, test_df = read_data()
     train_df, test_df = feature_engineering(train_df, test_df)
-    model = train_and_test(train_df)
+    model = train_and_test(train_df, test_df)
 
     predictions = model.predict(test_df)
     print('End')
