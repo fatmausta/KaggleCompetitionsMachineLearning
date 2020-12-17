@@ -6,9 +6,10 @@ import argparse
 import logging
 import pandas as pd
 from sklearn import svm
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, plot_roc_curve
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import scale
+import matplotlib.pyplot as plt
 
 
 def main():
@@ -107,7 +108,7 @@ def feature_engineering(train_df, test_df):
     return train_df, test_df
 
 
-def train_and_test(train_df, test_df):
+def cross_validate(train_df):
     """
 
     Train and test using SVM and return predictions.
@@ -116,8 +117,6 @@ def train_and_test(train_df, test_df):
     ----------
     train_df : pandas dataframe
         Training dataset
-    test_df : pandas dataframe
-        Test dataset
 
     Returns
     -------
@@ -133,14 +132,23 @@ def train_and_test(train_df, test_df):
     clf.fit(train_df.iloc[:, 1:], train_df['Survived'])
     # create training and test split
     x_train, x_test, y_train, y_test = train_test_split(train_df.iloc[:, 1:], train_df.iloc[:,0], test_size=0.3)#,
-                                                        # stratify=True, random_state=101)
-        # train_test_split(train_df, test_df, test_size=0.3, random_state=101)
+
     pred_train = clf.predict(x_train)
     pred_test = clf.predict(x_test)
 
     logging.info('training accuracy: {}'.format(accuracy_score(y_train, pred_train)))
     logging.info('validation accuracy: {}'.format(accuracy_score(y_test, pred_test)))
 
+    plot_roc_curve(clf, x_train, y_train)
+    plt.title('Training set ROC Curve')
+    plt.savefig('plots/training_ROC.png')
+    plt.show()
+    plt.clf()
+    plot_roc_curve(clf, x_test, y_test)
+    plt.title('Validation set ROC Curve')
+    plt.savefig('plots/validation_ROC.png')
+    plt.show()
+    plt.clf()
     return clf
 
 
@@ -148,11 +156,11 @@ if __name__ == '__main__':
     start = time.time()
     # set up logger
     FORMAT = '%(asctime)-15s %(levelname)s-8s %(message)s'
-    logging.basicConfig(filename='run_{}.log'.format(time.strftime("%Y.%m.%d_%H.%M.%S"), time.localtime()), format=FORMAT, level=logging.DEBUG)
+    logging.basicConfig(filename='logs/run_{}.log'.format(time.strftime("%Y.%m.%d_%H.%M.%S"), time.localtime()), format=FORMAT, level=logging.DEBUG)
 
     train_df, test_df = main()
     train_df, test_df = feature_engineering(train_df, test_df)
-    model = train_and_test(train_df, test_df)
+    model = cross_validate(train_df)
 
     predictions = model.predict(test_df)
     print('End')
