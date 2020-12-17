@@ -148,23 +148,30 @@ def train_and_test(train_df, test_df):
     prev_train = sum(y_train)/len(y_train)
     prev_val = sum(y_val)/len(y_val)
 
-    logging.info('prevalence of training dataset: {}'.format(prev_train))
-    logging.info('prevalence of validation dataset: {}'.format(prev_val))
+    print('prevalence of training: %{:.2f} validation: %{:.2f}'.format(prev_train, prev_val))
+    logging.info('prevalence of training dataset: %{:.2f} validation dataset: %{:.2f}'.format(prev_train, prev_val))
 
     logging.info('Size of training set: {} (%{:.2f})'.format(len(x_train), len(x_train)/size_total*100))
     logging.info('Size of validation set: {} (%{:.2f})'.format(len(x_val), len(x_val)/size_total*100))
     logging.info('Size of test set: {} (%{:.2f})'.format(len(test_df), len(test_df)/size_total*100))
 
-    logging.info('training accuracy: {}'.format(accuracy_score(y_train, pred_train)))
-    logging.info('validation accuracy: {}'.format(accuracy_score(y_val, pred_val)))
+    logging.info('training accuracy: %{:.2f} precision: %{:.2f} recall: %{:.2f}'.format(accuracy_score(y_train, pred_train), precision_score(y_train, pred_train), recall_score(y_train, pred_train)))
+    logging.info('validation accuracy: %{:.2f} precision: %{:.2f} recall: %{:.2f}'.format(accuracy_score(y_val, pred_val), precision_score(y_val, pred_val), recall_score(y_val, pred_val)))
 
-    print('training accuracy: {} precision: {} recall: {} '.format(accuracy_score(y_train, pred_train), precision_score(y_train, pred_train), recall_score(y_train, pred_train)))
-    print('validation accuracy: {} precision: {} recall: {}'.format(accuracy_score(y_val, pred_val), precision_score(y_val, pred_val), recall_score(y_val, pred_val)))
+    print('training accuracy: %{:.2f} precision: %{:.2f} recall: %{:.2f}'.format(accuracy_score(y_train, pred_train), precision_score(y_train, pred_train), recall_score(y_train, pred_train)))
+    print('validation accuracy: %{:.2f} precision: %{:.2f} recall: %{:.2f}'.format(accuracy_score(y_val, pred_val), precision_score(y_val, pred_val), recall_score(y_val, pred_val)))
 
-    print('training conf matrix: \n{}'.format(confusion_matrix(y_train, pred_train)))
-    print('validation conf matrix: \n{}'.format(confusion_matrix(y_val, pred_val)))
+    tn, fp, fn, tp = confusion_matrix(y_train, pred_train).ravel()
+    logging.info('training conf matrix: \n{}'.format(confusion_matrix(y_train, pred_train)))
+    logging.info('tn: {}, fp: {}, fn: {}, tp:{}'.format(tn, fp, fn, tp))
+    print('tn: {}, fp: {}, fn: {}, tp:{}'.format(tn, fp, fn, tp))
 
-    logging.info('')
+    tn, fp, fn, tp = confusion_matrix(y_val, pred_val).ravel()
+    logging.info('validation conf matrix: \n{}'.format(confusion_matrix(y_val, pred_val)))
+    logging.info('tn: {}, fp: {}, fn: {}, tp:{}'.format(tn, fp, fn, tp))
+    print('tn: {}, fp: {}, fn: {}, tp:{}'.format(tn, fp, fn, tp))
+
+    logging.info('tn: {}, fp: {}, fn: {}, tp:{}'.format(tn, fp, fn, tp))
     logging.info('Predictions training: \n{}'.format(pred_train))
     logging.info('Predictions validation: \n{}'.format(pred_val))
 
