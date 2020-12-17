@@ -98,8 +98,13 @@ def feature_engineering(train_df, test_df):
     logging.info('Features used: {}'.format(feature_cols))
     print('Features used: {}'.format(feature_cols))
 
+    # get dummy features
     train_df = pd.get_dummies(train_df[['Survived'] + feature_cols], columns=['Sex', 'Embarked'])
     test_df = pd.get_dummies(test_df[feature_cols], columns=['Sex', 'Embarked'])
+
+    # fill nan values
+    train_df.fillna(0, inplace=True)
+    test_df.fillna(0, inplace=True)
 
     # Scale features
     train_df['Age'] = scale(train_df['Age'])
