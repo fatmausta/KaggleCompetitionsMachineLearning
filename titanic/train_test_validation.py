@@ -136,30 +136,33 @@ def train_and_test(train_df, test_df):
         1D numpy array containing predictions for test set, test_df.
 
     """
+
+    # create training and test split
+    x_train, x_val, y_train, y_val = train_test_split(train_df.drop(['Survived', 'PassengerId'], axis=1), train_df['Survived'], test_size=0.3)
+    x_test = test_df.drop(['PassengerId'], axis=1)
+
     # set up an SVM classifier
     C = .8
     logging.info('Training using an SVM model.')
     logging.info('SVM Params: C: {}'.format(C))
     clf = svm.SVC(C=C)
-    clf.fit(train_df.iloc[:, 1:], train_df['Survived'])
-    # create training and test split
-    x_train, x_val, y_train, y_val = train_test_split(train_df.iloc[:, 1:], train_df.iloc[:,0], test_size=0.3)
-    x_test, y_test = test_df.iloc[:,1:], test_df.iloc[:,0]
+    clf.fit(x_train, y_train)
 
     pred_train = clf.predict(x_train)
     pred_val = clf.predict(x_val)
-    size_total = len(x_train) + len(x_val) + len(test_df)
+    pred_test = clf.predict(x_test)
 
-    size_total = len(x_train) + len(x_val) + len(test_df)
+    size_total = len(x_train) + len(x_val) + len(x_test)
+
     prev_train = sum(y_train)/len(y_train)
     prev_val = sum(y_val)/len(y_val)
-
-    print('prevalence of training: %{:.2f} validation: %{:.2f}'.format(prev_train, prev_val))
-    logging.info('prevalence of training dataset: %{:.2f} validation dataset: %{:.2f}'.format(prev_train, prev_val))
 
     logging.info('Size of training set: {} (%{:.2f})'.format(len(x_train), len(x_train)/size_total*100))
     logging.info('Size of validation set: {} (%{:.2f})'.format(len(x_val), len(x_val)/size_total*100))
     logging.info('Size of test set: {} (%{:.2f})'.format(len(test_df), len(test_df)/size_total*100))
+
+    print('prevalence of training: %{:.2f} validation: %{:.2f}'.format(prev_train, prev_val))
+    logging.info('prevalence of training dataset: %{:.2f} validation dataset: %{:.2f}'.format(prev_train, prev_val))
 
     logging.info('training accuracy: %{:.2f} precision: %{:.2f} recall: %{:.2f}'.format(accuracy_score(y_train, pred_train), precision_score(y_train, pred_train), recall_score(y_train, pred_train)))
     logging.info('validation accuracy: %{:.2f} precision: %{:.2f} recall: %{:.2f}'.format(accuracy_score(y_val, pred_val), precision_score(y_val, pred_val), recall_score(y_val, pred_val)))
@@ -191,7 +194,8 @@ def train_and_test(train_df, test_df):
     plt.savefig('plots/validation_ROC.png')
     plt.show()
     plt.clf()
-    return clf
+
+    return pred_test
 
 
 if __name__ == '__main__':
@@ -202,16 +206,13 @@ if __name__ == '__main__':
 
     train_df, test_df = read_data()
     train_df, test_df = feature_engineering(train_df, test_df)
-    model = train_and_test(train_df, test_df)
-    predictions = model.predict(test_df.drop(['PassengerId'], axis=1))
-    logging.info('Predictions testing: \n{}'.format(predictions))
-    submission = {'PassengerId': test_df['PassengerId'], 'Survived': predictions}
+    predictions_test = train_and_test(train_df, test_df)
+    logging.info('Predictions testing: \n{}'.format(predictions_test))
+    submission = {'PassengerId': test_df['PassengerId'], 'Survived': predictions_test}
     df = pd.DataFrame(submission)
     df.set_index('PassengerId', inplace=True)
     df.to_csv('submission_titanic.csv')
 
-
-    predictions = model.predict(test_df)
     print('End')
     end = time.time()
     logging.info('Took {:.2f} seconds'.format(end-start))
