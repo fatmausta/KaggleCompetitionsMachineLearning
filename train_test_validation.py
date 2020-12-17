@@ -99,6 +99,9 @@ def feature_engineering(train_df, test_df):
     train_df['Age'] = scale(train_df['Age'])
     train_df['Fare'] = scale(train_df['Fare'])
 
+    test_df['Age'] = scale(test_df['Age'])
+    test_df['Fare'] = scale(test_df['Fare'])
+
     logging.info('Scaled features')
 
     # drop nan features
@@ -108,7 +111,7 @@ def feature_engineering(train_df, test_df):
     return train_df, test_df
 
 
-def cross_validate(train_df):
+def train_and_test(train_df):
     """
 
     Train and test using SVM and return predictions.
@@ -160,7 +163,7 @@ if __name__ == '__main__':
 
     train_df, test_df = main()
     train_df, test_df = feature_engineering(train_df, test_df)
-    model = cross_validate(train_df)
+    model = train_and_test(train_df)
 
     predictions = model.predict(test_df)
     print('End')
