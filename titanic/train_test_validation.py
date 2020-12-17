@@ -93,7 +93,8 @@ def feature_engineering(train_df, test_df):
 
     # Select features to train and test, convert categorical features to dummy features
     feature_cols = ['Pclass', 'Sex', 'Age', 'Fare', 'Embarked']
-
+    passengerID_train = train_df['PassengerId']
+    passengerID_test = test_df['PassengerId']
     logging.info('Features used: {}'.format(feature_cols))
     print('Features used: {}'.format(feature_cols))
 
@@ -106,6 +107,9 @@ def feature_engineering(train_df, test_df):
 
     test_df['Age'] = scale(test_df['Age'])
     test_df['Fare'] = scale(test_df['Fare'])
+
+    train_df['PassengerId'] = passengerID_train
+    test_df['PassengerId'] = passengerID_test
 
     logging.info('Scaled features')
 
@@ -139,12 +143,14 @@ def train_and_test(train_df, test_df):
     clf = svm.SVC(C=C)
     clf.fit(train_df.iloc[:, 1:], train_df['Survived'])
     # create training and test split
-    x_train, x_val, y_train, y_val = train_test_split(train_df.iloc[:, 1:], train_df.iloc[:,0], test_size=0.3)#,
+    x_train, x_val, y_train, y_val = train_test_split(train_df.iloc[:, 1:], train_df.iloc[:,0], test_size=0.3)
+    x_test, y_test = test_df.iloc[:,1:], test_df.iloc[:,0]
 
     pred_train = clf.predict(x_train)
     pred_val = clf.predict(x_val)
     size_total = len(x_train) + len(x_val) + len(test_df)
 
+    size_total = len(x_train) + len(x_val) + len(test_df)
     prev_train = sum(y_train)/len(y_train)
     prev_val = sum(y_val)/len(y_val)
 
@@ -197,6 +203,13 @@ if __name__ == '__main__':
     train_df, test_df = read_data()
     train_df, test_df = feature_engineering(train_df, test_df)
     model = train_and_test(train_df, test_df)
+    predictions = model.predict(test_df.drop(['PassengerId'], axis=1))
+    logging.info('Predictions testing: \n{}'.format(predictions))
+    submission = {'PassengerId': test_df['PassengerId'], 'Survived': predictions}
+    df = pd.DataFrame(submission)
+    df.set_index('PassengerId', inplace=True)
+    df.to_csv('submission_titanic.csv')
+
 
     predictions = model.predict(test_df)
     print('End')
