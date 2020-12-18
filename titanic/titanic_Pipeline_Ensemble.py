@@ -14,6 +14,7 @@ from sklearn.metrics import plot_roc_curve
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import scale
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def read_data():
@@ -70,7 +71,7 @@ def read_data():
     return train_df, test_df
 
 
-def feature_engineering(train_df, test_df):
+def feature_engineering(train, test):
     """
 
     Converts categorical features into dummy features.
@@ -91,38 +92,81 @@ def feature_engineering(train_df, test_df):
 
     """
 
-    # Select features to train and test, convert categorical features to dummy features
-    feature_cols = ['Pclass', 'Sex', 'Age', 'Fare', 'Embarked']
-    passengerID_train = train_df['PassengerId']
-    passengerID_test = test_df['PassengerId']
-    logging.info('Features used: {}'.format(feature_cols))
-    print('Features used: {}'.format(feature_cols))
+    full_data = [train, test]
 
-    # get dummy features
-    train_df = pd.get_dummies(train_df[['Survived'] + feature_cols], columns=['Sex', 'Embarked'])
-    test_df = pd.get_dummies(test_df[feature_cols], columns=['Sex', 'Embarked'])
+    # Some features of my own that I have added in
 
-    # fill nan values
-    train_df.fillna(0, inplace=True)
-    test_df.fillna(0, inplace=True)
+    # Feature that tells whether a passenger had a cabin on the Titanic
+    train['Has_Cabin'] = train["Cabin"].apply(lambda x: 0 if type(x) == float else 1)
+    test['Has_Cabin'] = test["Cabin"].apply(lambda x: 0 if type(x) == float else 1)
 
-    # Scale features
-    train_df['Age'] = scale(train_df['Age'])
-    train_df['Fare'] = scale(train_df['Fare'])
+    # Feature engineering steps taken from Sina
+    # Create new feature FamilySize as a combination of SibSp and Parch
+    for dataset in full_data:
+        dataset['FamilySize'] = dataset['SibSp'] + dataset['Parch'] + 1
+    # Create new feature IsAlone from FamilySize
+    for dataset in full_data:
+        dataset['IsAlone'] = 0
+        dataset.loc[dataset['FamilySize'] == 1, 'IsAlone'] = 1
+    # Remove all NULLS in the Embarked column
+    for dataset in full_data:
+        dataset['Embarked'] = dataset['Embarked'].fillna('S')
+    # Remove all NULLS in the Fare column and create a new feature CategoricalFare
+    for dataset in full_data:
+        dataset['Fare'] = dataset['Fare'].fillna(train['Fare'].median())
+    train['CategoricalFare'] = pd.qcut(train['Fare'], 4)
+    # Create a New feature CategoricalAge
+    for dataset in full_data:
+        age_avg = dataset['Age'].mean()
+        age_std = dataset['Age'].std()
+        age_null_count = dataset['Age'].isnull().sum()
+        age_null_random_list = np.random.randint(age_avg - age_std, age_avg + age_std, size=age_null_count)
+        dataset['Age'][np.isnan(dataset['Age'])] = age_null_random_list
+        dataset['Age'] = dataset['Age'].astype(int)
+    train['CategoricalAge'] = pd.cut(train['Age'], 5)
 
-    test_df['Age'] = scale(test_df['Age'])
-    test_df['Fare'] = scale(test_df['Fare'])
+    # Define function to extract titles from passenger names
+    def get_title(name):
+        title_search = re.search(' ([A-Za-z]+)\.', name)
+        # If the title exists, extract and return it.
+        if title_search:
+            return title_search.group(1)
+        return ""
 
-    train_df['PassengerId'] = passengerID_train
-    test_df['PassengerId'] = passengerID_test
+    # Create a new feature Title, containing the titles of passenger names
+    for dataset in full_data:
+        dataset['Title'] = dataset['Name'].apply(get_title)
+    # Group all non-common titles into one single grouping "Rare"
+    for dataset in full_data:
+        dataset['Title'] = dataset['Title'].replace(
+            ['Lady', 'Countess', 'Capt', 'Col', 'Don', 'Dr', 'Major', 'Rev', 'Sir', 'Jonkheer', 'Dona'], 'Rare')
 
-    logging.info('Scaled features')
+        dataset['Title'] = dataset['Title'].replace('Mlle', 'Miss')
+        dataset['Title'] = dataset['Title'].replace('Ms', 'Miss')
+        dataset['Title'] = dataset['Title'].replace('Mme', 'Mrs')
 
-    # drop nan features
-    train_df.dropna(inplace=True)
-    test_df.dropna(inplace=True)
+    for dataset in full_data:
+        # Mapping Sex
+        dataset['Sex'] = dataset['Sex'].map({'female': 0, 'male': 1}).astype(int)
 
-    return train_df, test_df
+        # Mapping titles
+        title_mapping = {"Mr": 1, "Miss": 2, "Mrs": 3, "Master": 4, "Rare": 5}
+        dataset['Title'] = dataset['Title'].map(title_mapping)
+        dataset['Title'] = dataset['Title'].fillna(0)
+
+        # Mapping Embarked
+        dataset['Embarked'] = dataset['Embarked'].map({'S': 0, 'C': 1, 'Q': 2}).astype(int)
+
+    train['FamilySize'] = scale(train['FamilySize'])
+    test['FamilySize'] = scale(test['FamilySize'])
+
+    train['Fare'] = scale(train['Fare'])
+    test['Fare'] = scale(test['Fare'])
+
+    train['Age'] = scale(train['Age'])
+    test['Age'] = scale(test['Age'])
+
+    return train, test
 
 
 def train_and_test(train_df, test_df):
@@ -142,14 +186,20 @@ def train_and_test(train_df, test_df):
 
     """
 
+    # Feature selection
+    drop_elements = ['PassengerId', 'Name', 'Ticket', 'Cabin', 'SibSp']
+    train_df = train_df.drop(drop_elements + ['CategoricalAge', 'CategoricalFare'], axis=1)
+
     # create training and test split
-    x_train, x_val, y_train, y_val = train_test_split(train_df.drop(['Survived', 'PassengerId'], axis=1), train_df['Survived'], test_size=0.3)
-    x_test = test_df.drop(['PassengerId'], axis=1)
+    x_train, x_val, y_train, y_val = train_test_split(train_df.drop(['Survived'], axis=1), train_df['Survived'], test_size=0.3)
+    x_test = test_df.drop(drop_elements, axis=1)
 
     # set up an SVM classifier
     C = .8
     logging.info('Training using an SVM model.')
     logging.info('SVM Params: C: {}'.format(C))
+    logging.info('Features Used: {}'.format(x_train.keys()))
+    print('Features Used: {}'.format(x_train.keys()))
     clf = svm.SVC(C=C)
     clf.fit(x_train, y_train)
 
@@ -189,16 +239,14 @@ def train_and_test(train_df, test_df):
     logging.info('Predictions training: \n{}'.format(pred_train))
     logging.info('Predictions validation: \n{}'.format(pred_val))
 
+    plt.clf()
     plot_roc_curve(clf, x_train, y_train)
     plt.title('Training set ROC Curve')
     plt.savefig('plots/training_ROC.png')
-    plt.show()
     plt.clf()
     plot_roc_curve(clf, x_val, y_val)
     plt.title('Validation set ROC Curve')
     plt.savefig('plots/validation_ROC.png')
-    plt.show()
-    plt.clf()
 
     return pred_test
 
