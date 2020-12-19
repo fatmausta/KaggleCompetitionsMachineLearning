@@ -5,7 +5,6 @@ import time
 import argparse
 import logging
 import pandas as pd
-from sklearn import svm
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import precision_score
@@ -15,6 +14,91 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import scale
 import matplotlib.pyplot as plt
 import numpy as np
+import xgboost as xgb
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import AdaBoostClassifier
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.ensemble import ExtraTreesClassifier
+
+# Class to extend the Sklearn classifier
+class SklearnHelper(object):
+    def __init__(self, clf, seed=0, params=None):
+        params['random_state'] = seed
+        self.clf = clf(**params)
+
+    def train(self, x_train, y_train):
+        self.clf.fit(x_train, y_train)
+
+    def predict(self, x):
+        return self.clf.predict(x)
+
+    def fit(self, x, y):
+        return self.clf.fit(x, y)
+
+    def feature_importances(self, x, y):
+        print(self.clf.fit(x, y).feature_importances_)
+        return self.clf.fit(x, y).feature_importances_
+
+
+
+def set_parameters():
+    # Put in our parameters for said classifiers
+    # Random Forest parameters
+    rf_params = {
+        'n_jobs': -1,
+        'n_estimators': 500,
+        'warm_start': True,
+        # 'max_features': 0.2,
+        'max_depth': 6,
+        'min_samples_leaf': 2,
+        'max_features': 'sqrt',
+        'verbose': 0
+    }
+
+    # Extra Trees Parameters
+    et_params = {
+        'n_jobs': -1,
+        'n_estimators': 500,
+        # 'max_features': 0.5,
+        'max_depth': 8,
+        'min_samples_leaf': 2,
+        'verbose': 0
+    }
+
+    # AdaBoost parameters
+    ada_params = {
+        'n_estimators': 500,
+        'learning_rate': 0.75
+    }
+
+    # Gradient Boosting parameters
+    gb_params = {
+        'n_estimators': 500,
+        # 'max_features': 0.2,
+        'max_depth': 5,
+        'min_samples_leaf': 2,
+        'verbose': 0
+    }
+
+    # Support Vector Classifier parameters
+    svc_params = {
+        'kernel': 'linear',
+        'C': 0.025
+    }
+
+    return rf_params, et_params, ada_params, gb_params, svc_params
+
+
+def create_models(rf_params, et_params, ada_params, gb_params, svc_params, SEED=0):
+    # Create 5 objects that represent our 4 models
+    rf = SklearnHelper(clf=RandomForestClassifier, seed=SEED, params=rf_params)
+    et = SklearnHelper(clf=ExtraTreesClassifier, seed=SEED, params=et_params)
+    ada = SklearnHelper(clf=AdaBoostClassifier, seed=SEED, params=ada_params)
+    gb = SklearnHelper(clf=GradientBoostingClassifier, seed=SEED, params=gb_params)
+    svc = SklearnHelper(clf=SVC, seed=SEED, params=svc_params)
+
+    return rf, et, ada, gb, svc
 
 
 def read_data():
@@ -169,7 +253,7 @@ def feature_engineering(train, test):
     return train, test
 
 
-def train_and_test(train_df, test_df):
+def select_features(train_df, test_df):
     """
 
     Train and test using SVM and return predictions.
@@ -181,8 +265,8 @@ def train_and_test(train_df, test_df):
 
     Returns
     -------
-    predictions : numpy array
-        1D numpy array containing predictions for test set, test_df.
+    x_train, y_train, x_test
+
 
     """
 
@@ -191,62 +275,65 @@ def train_and_test(train_df, test_df):
     train_df = train_df.drop(drop_elements + ['CategoricalAge', 'CategoricalFare'], axis=1)
 
     # create training and test split
-    x_train, x_val, y_train, y_val = train_test_split(train_df.drop(['Survived'], axis=1), train_df['Survived'], test_size=0.3)
+    x_train = train_df.drop(['Survived'], axis=1)
+    y_train = train_df['Survived']
     x_test = test_df.drop(drop_elements, axis=1)
 
+    return x_train, y_train, x_test
+
+
+def train_and_test(x_train, y_train):
     # set up an SVM classifier
     C = .8
     logging.info('Training using an SVM model.')
     logging.info('SVM Params: C: {}'.format(C))
     logging.info('Features Used: {}'.format(x_train.keys()))
     print('Features Used: {}'.format(x_train.keys()))
-    clf = svm.SVC(C=C)
+    clf = SVC(C=C)
     clf.fit(x_train, y_train)
+    return clf
 
+
+def predict_and_log(clf, x_train, y_train, x_test):
+    """
+
+     predictions : numpy array
+        1D numpy array containing predictions for test set, test_df.
+
+    :param clf:
+    :param x_train:
+    :param y_train:
+    :param x_test:
+    :return:
+    """
     pred_train = clf.predict(x_train)
-    pred_val = clf.predict(x_val)
     pred_test = clf.predict(x_test)
 
-    size_total = len(x_train) + len(x_val) + len(x_test)
+    size_total = len(x_train) + len(x_test)
 
     prev_train = sum(y_train)/len(y_train)
-    prev_val = sum(y_val)/len(y_val)
 
     logging.info('Size of training set: {} (%{:.2f})'.format(len(x_train), len(x_train)/size_total*100))
-    logging.info('Size of validation set: {} (%{:.2f})'.format(len(x_val), len(x_val)/size_total*100))
     logging.info('Size of test set: {} (%{:.2f})'.format(len(test_df), len(test_df)/size_total*100))
 
-    print('prevalence of training: %{:.2f} validation: %{:.2f}'.format(prev_train, prev_val))
-    logging.info('prevalence of training dataset: %{:.2f} validation dataset: %{:.2f}'.format(prev_train, prev_val))
+    print('prevalence of training: %{:.2f}'.format(prev_train))
+    logging.info('prevalence of training dataset: %{:.2f}'.format(prev_train))
 
     logging.info('training accuracy: %{:.2f} precision: %{:.2f} recall: %{:.2f}'.format(accuracy_score(y_train, pred_train), precision_score(y_train, pred_train), recall_score(y_train, pred_train)))
-    logging.info('validation accuracy: %{:.2f} precision: %{:.2f} recall: %{:.2f}'.format(accuracy_score(y_val, pred_val), precision_score(y_val, pred_val), recall_score(y_val, pred_val)))
 
     print('training accuracy: %{:.2f} precision: %{:.2f} recall: %{:.2f}'.format(accuracy_score(y_train, pred_train), precision_score(y_train, pred_train), recall_score(y_train, pred_train)))
-    print('validation accuracy: %{:.2f} precision: %{:.2f} recall: %{:.2f}'.format(accuracy_score(y_val, pred_val), precision_score(y_val, pred_val), recall_score(y_val, pred_val)))
 
     tn, fp, fn, tp = confusion_matrix(y_train, pred_train).ravel()
     logging.info('training conf matrix: \n{}'.format(confusion_matrix(y_train, pred_train)))
     logging.info('tn: {}, fp: {}, fn: {}, tp:{}'.format(tn, fp, fn, tp))
     print('tn: {}, fp: {}, fn: {}, tp:{}'.format(tn, fp, fn, tp))
 
-    tn, fp, fn, tp = confusion_matrix(y_val, pred_val).ravel()
-    logging.info('validation conf matrix: \n{}'.format(confusion_matrix(y_val, pred_val)))
-    logging.info('tn: {}, fp: {}, fn: {}, tp:{}'.format(tn, fp, fn, tp))
-    print('tn: {}, fp: {}, fn: {}, tp:{}'.format(tn, fp, fn, tp))
-
-    logging.info('tn: {}, fp: {}, fn: {}, tp:{}'.format(tn, fp, fn, tp))
     logging.info('Predictions training: \n{}'.format(pred_train))
-    logging.info('Predictions validation: \n{}'.format(pred_val))
 
     plt.clf()
     plot_roc_curve(clf, x_train, y_train)
     plt.title('Training set ROC Curve')
     plt.savefig('plots/training_ROC.png')
-    plt.clf()
-    plot_roc_curve(clf, x_val, y_val)
-    plt.title('Validation set ROC Curve')
-    plt.savefig('plots/validation_ROC.png')
 
     return pred_test
 
@@ -259,9 +346,54 @@ if __name__ == '__main__':
 
     train_df, test_df = read_data()
     train_df, test_df = feature_engineering(train_df, test_df)
-    predictions_test = train_and_test(train_df, test_df)
-    logging.info('Predictions testing: \n{}'.format(predictions_test))
-    submission = {'PassengerId': test_df['PassengerId'], 'Survived': predictions_test}
+    x_train, y_train, x_test = select_features(train_df, test_df)
+
+    rf_params, et_params, ada_params, gb_params, svc_params = set_parameters()
+    rf, et, ada, gb, svc = create_models(rf_params, et_params, ada_params, gb_params, svc_params)
+    training_predictions = {}
+    test_predictions = {}
+    feature_importances = {'features': x_train.keys()}
+    for name, model in zip(['rf', 'et', 'ada', 'gb', 'svc'], [rf, et, ada, gb, svc]):
+        model.fit(x_train, y_train)
+        training_predictions[name] = model.predict(x_train)
+        test_predictions[name] = model.predict(x_test)
+        if name!='svc':
+            feature_importances[name] = model.feature_importances(x_train, y_train)
+
+    # save feature importances
+    pd.DataFrame(feature_importances).to_csv('feature_importances.csv')
+
+    # use predictions as features
+    # x_train = pd.concat([x_train, pd.DataFrame(training_predictions)])
+    # x_test = pd.concat([x_test, pd.DataFrame(test_predictions)])
+
+    x_train = pd.DataFrame(training_predictions)
+    x_test = pd.DataFrame(test_predictions)
+
+    gbm = xgb.XGBClassifier(
+        # learning_rate = 0.02,
+        n_estimators=2000,
+        max_depth=4,
+        min_child_weight=2,
+        # gamma=1,
+        gamma=0.9,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        objective='binary:logistic',
+        nthread=-1,
+        scale_pos_weight=1).fit(x_train, y_train)
+    predictions = gbm.predict(x_test)
+    train_pred = gbm.predict(x_train)
+
+    print('training accuracy: {}'.format(accuracy_score(y_train, train_pred)))
+    print('training precision: {}'.format(precision_score(y_train, train_pred)))
+    print('training recall: {}'.format(recall_score(y_train, train_pred)))
+
+    logging.info('training accuracy: {}'.format(accuracy_score(y_train, train_pred)))
+    logging.info('training precision: {}'.format(precision_score(y_train, train_pred)))
+    logging.info('training recall: {}'.format(recall_score(y_train, train_pred)))
+
+    submission = {'PassengerId': test_df['PassengerId'], 'Survived': predictions}
     df = pd.DataFrame(submission)
     df.set_index('PassengerId', inplace=True)
     df.to_csv('submission_titanic.csv')
