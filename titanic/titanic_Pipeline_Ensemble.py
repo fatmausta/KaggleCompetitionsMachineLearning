@@ -465,7 +465,7 @@ if __name__ == '__main__':
     # pred_train, pred_val, pred_test = aggregate_predictions_xgboost(x_train, y_train, x_val, y_val, x_test)
     pred_train, pred_val, pred_test = aggregate_predictions_voting(x_train, y_train, x_val, y_val, x_test)
 
-    submission = {'PassengerId': test_df['PassengerId'], 'Survived': pred_test}
+    submission = {'PassengerId': test_df['PassengerId'], 'Survived': np.reshape(pred_test, -1)}
     df = pd.DataFrame(submission)
     df.set_index('PassengerId', inplace=True)
     df.to_csv('submission_titanic.csv')
