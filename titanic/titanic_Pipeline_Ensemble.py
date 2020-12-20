@@ -363,12 +363,13 @@ if __name__ == '__main__':
     # save feature importances
     pd.DataFrame(feature_importances).to_csv('feature_importances.csv')
 
+    logging.info(feature_importances)
     # use predictions as features
-    # x_train = pd.concat([x_train, pd.DataFrame(training_predictions)])
-    # x_test = pd.concat([x_test, pd.DataFrame(test_predictions)])
+    x_train = pd.concat([x_train, pd.DataFrame(training_predictions)], axis=1)
+    x_test = pd.concat([x_test, pd.DataFrame(test_predictions)], axis=1)
 
-    x_train = pd.DataFrame(training_predictions)
-    x_test = pd.DataFrame(test_predictions)
+    # x_train = pd.DataFrame(training_predictions)
+    # x_test = pd.DataFrame(test_predictions)
 
     gbm = xgb.XGBClassifier(
         # learning_rate = 0.02,
