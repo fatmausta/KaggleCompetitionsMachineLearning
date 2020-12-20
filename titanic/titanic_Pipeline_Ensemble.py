@@ -338,6 +338,87 @@ def predict_and_log(clf, x_train, y_train, x_test):
     return pred_test
 
 
+def print_log_results(y_true, y_pred, dataset_name):
+    print('{} accuracy: {}'.format(dataset_name, accuracy_score(y_true, y_pred)))
+    print('{} precision: {}'.format(dataset_name, precision_score(y_true, y_pred)))
+    print('{} recall: {}'.format(dataset_name, recall_score(y_true, y_pred)))
+
+    logging.info('{} accuracy: {}'.format(dataset_name, accuracy_score(y_true, y_pred)))
+    logging.info('{} precision: {}'.format(dataset_name, precision_score(y_true, y_pred)))
+    logging.info('{} recall: {}'.format(dataset_name, recall_score(y_true, y_pred)))
+
+
+def aggregate_predictions_xgboost(x_train, y_train, x_val, y_val, x_test):
+
+    eval_set = [(x_train, y_train), (x_val, y_val)]
+    gbm = xgb.XGBClassifier(
+        learning_rate=0.01,
+        n_estimators=50,
+        max_depth=4,
+        min_child_weight=10,
+        # gamma=1,
+        gamma=0.8,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        objective='binary:logistic',
+        nthread=-1,
+        scale_pos_weight=1).fit(x_train, y_train, early_stopping_rounds=10, eval_set=eval_set,
+                                eval_metric=["error", "logloss"], verbose=True)
+
+    pred_train = gbm.predict(x_train)
+    pred_val = gbm.predict(x_val)
+    pred_test = gbm.predict(x_test)
+
+    print_log_results(y_train, pred_train, 'training')
+    print_log_results(y_val, pred_val, 'validation')
+
+    # retrieve performance metrics
+    results = gbm.evals_result()
+    epochs = len(results['validation_0']['error'])
+    x_axis = range(0, epochs)
+    # plot log loss
+    fig, ax = plt.subplots()
+    ax.plot(x_axis, results['validation_0']['logloss'], label='Train')
+    ax.plot(x_axis, results['validation_1']['logloss'], label='Test')
+    ax.legend()
+    plt.ylabel('Log Loss')
+    plt.title('XGBoost Log Loss')
+    plt.savefig('plots/logloss.png')
+    # plot classification error
+    fig, ax = plt.subplots()
+    ax.plot(x_axis, results['validation_0']['error'], label='Train')
+    ax.plot(x_axis, results['validation_1']['error'], label='Test')
+    ax.legend()
+    plt.ylabel('Classification Error')
+    plt.title('XGBoost Classification Error')
+    plt.savefig('plots/error.png')
+
+    return pred_train, pred_val, pred_test
+
+
+def aggregate_predictions_voting(x_train, y_train, x_val, y_val, x_test):
+    """
+    x_train, x_val, x_test are all predictions.
+    This function votes the results.
+
+    :param x_train:
+    :param y_train:
+    :param x_val:
+    :param y_val:
+    :param x_test:
+    :return:
+    """
+
+    pred_train = x_train.mode(axis=1).values
+    pred_val = x_val.mode(axis=1).values
+    pred_test = x_test.mode(axis=1).values
+
+    print_log_results(y_train, pred_train, 'training')
+    print_log_results(y_val, pred_val, 'validation')
+
+    return pred_train, pred_val, pred_test
+
+
 if __name__ == '__main__':
     start = time.time()
     # set up logger
@@ -381,67 +462,13 @@ if __name__ == '__main__':
     x_val = pd.DataFrame(validation_predictions)
     x_test = pd.DataFrame(test_predictions)
 
-    eval_set = [(x_train, y_train), (x_val, y_val)]
-    gbm = xgb.XGBClassifier(
-        learning_rate = 0.01,
-        n_estimators=50,
-        max_depth=4,
-        min_child_weight=10,
-        # gamma=1,
-        gamma=0.8,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        objective='binary:logistic',
-        nthread=-1,
-        scale_pos_weight=1).fit(x_train, y_train, early_stopping_rounds=10, eval_set=eval_set, eval_metric=["error", "logloss"], verbose=True)
-
-    pred_test = gbm.predict(x_test)
-    pred_train = gbm.predict(x_train)
-    pred_val = gbm.predict(x_val)
-
-    print('training accuracy: {}'.format(accuracy_score(y_train, pred_train)))
-    print('training precision: {}'.format(precision_score(y_train, pred_train)))
-    print('training recall: {}'.format(recall_score(y_train, pred_train)))
-
-    logging.info('training accuracy: {}'.format(accuracy_score(y_train, pred_train)))
-    logging.info('training precision: {}'.format(precision_score(y_train, pred_train)))
-    logging.info('training recall: {}'.format(recall_score(y_train, pred_train)))
-
-    print('validation accuracy: {}'.format(accuracy_score(y_val, pred_val)))
-    print('validation precision: {}'.format(precision_score(y_val, pred_val)))
-    print('validation recall: {}'.format(recall_score(y_val, pred_val)))
-
-    logging.info('validation accuracy: {}'.format(accuracy_score(y_val, pred_val)))
-    logging.info('validation precision: {}'.format(precision_score(y_val, pred_val)))
-    logging.info('validation recall: {}'.format(recall_score(y_val, pred_val)))
+    # pred_train, pred_val, pred_test = aggregate_predictions_xgboost(x_train, y_train, x_val, y_val, x_test)
+    pred_train, pred_val, pred_test = aggregate_predictions_voting(x_train, y_train, x_val, y_val, x_test)
 
     submission = {'PassengerId': test_df['PassengerId'], 'Survived': pred_test}
     df = pd.DataFrame(submission)
     df.set_index('PassengerId', inplace=True)
     df.to_csv('submission_titanic.csv')
-
-    # retrieve performance metrics
-    results = gbm.evals_result()
-    epochs = len(results['validation_0']['error'])
-    x_axis = range(0, epochs)
-    # plot log loss
-    fig, ax = plt.subplots()
-    ax.plot(x_axis, results['validation_0']['logloss'], label='Train')
-    ax.plot(x_axis, results['validation_1']['logloss'], label='Test')
-    ax.legend()
-    plt.ylabel('Log Loss')
-    plt.title('XGBoost Log Loss')
-    plt.savefig('plots/logloss.png')
-    # plt.show()
-    # plot classification error
-    fig, ax = plt.subplots()
-    ax.plot(x_axis, results['validation_0']['error'], label='Train')
-    ax.plot(x_axis, results['validation_1']['error'], label='Test')
-    ax.legend()
-    plt.ylabel('Classification Error')
-    plt.title('XGBoost Classification Error')
-    plt.savefig('plots/error.png')
-    # plt.show()
 
     print('End')
     end = time.time()
