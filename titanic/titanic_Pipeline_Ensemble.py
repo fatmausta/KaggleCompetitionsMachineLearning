@@ -41,7 +41,6 @@ class SklearnHelper(object):
         return self.clf.fit(x, y).feature_importances_
 
 
-
 def set_parameters():
     # Put in our parameters for said classifiers
     # Random Forest parameters
@@ -452,7 +451,8 @@ if __name__ == '__main__':
     pd.DataFrame(feature_importances).to_csv('feature_importances.csv')
     logging.info('Feature_importances')
     logging.info(feature_importances)
-    # use predictions and features as features
+
+    # optional, use predictions and features as features
     # x_train = pd.concat([x_train, pd.DataFrame(training_predictions, ignore_index=True)], axis=1)
     # x_val = pd.concat([x_val, pd.DataFrame(validation_predictions)], axis=1)
     # x_test = pd.concat([x_test, pd.DataFrame(test_predictions)], axis=1)
@@ -462,8 +462,9 @@ if __name__ == '__main__':
     x_val = pd.DataFrame(validation_predictions)
     x_test = pd.DataFrame(test_predictions)
 
-    # pred_train, pred_val, pred_test = aggregate_predictions_xgboost(x_train, y_train, x_val, y_val, x_test)
-    pred_train, pred_val, pred_test = aggregate_predictions_voting(x_train, y_train, x_val, y_val, x_test)
+    # CHOOSE ONE OF THE OPTIONS BELOW
+    pred_train, pred_val, pred_test = aggregate_predictions_xgboost(x_train, y_train, x_val, y_val, x_test)
+    # pred_train, pred_val, pred_test = aggregate_predictions_voting(x_train, y_train, x_val, y_val, x_test)
 
     submission = {'PassengerId': test_df['PassengerId'], 'Survived': np.reshape(pred_test, -1)}
     df = pd.DataFrame(submission)
